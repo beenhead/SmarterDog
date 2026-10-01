@@ -18,6 +18,7 @@ along with SmarterDog. If not, see <https://www.gnu.org/licenses/>
 #include "cleverdogudp.h"
 #include <arpa/inet.h>
 #include <QTcpSocket>
+#include <QNetworkInterface>
 
 CleverdogUDP::CleverdogUDP(QObject *parent) : QObject(parent)
 {
@@ -234,7 +235,22 @@ void CleverdogUDP::sendCommand(QHostAddress destinationHost, uint16_t command, Q
 	/* Parameters */
 	datagram.append(parameters);
 	/* Send datagram */
-	signallingSocket->writeDatagram(datagram, destinationHost, port);
+	if (destinationHost == QHostAddress(QHostAddress::Broadcast)) {
+		/* 255.255.255.255 only leaves via the default route, so send to each interface's broadcast address instead */
+		foreach (const QNetworkInterface &interface, QNetworkInterface::allInterfaces()) {
+			QNetworkInterface::InterfaceFlags flags = interface.flags();
+			if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::IsRunning) || !(flags & QNetworkInterface::CanBroadcast) || (flags & QNetworkInterface::IsLoopBack)) {
+				continue;
+			}
+			foreach (const QNetworkAddressEntry &entry, interface.addressEntries()) {
+				if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol && !entry.broadcast().isNull()) {
+					signallingSocket->writeDatagram(datagram, entry.broadcast(), port);
+				}
+			}
+		}
+	} else {
+		signallingSocket->writeDatagram(datagram, destinationHost, port);
+	}
 }
 
 void CleverdogUDP::addStringWithPadding(QString value, QByteArray *payload, int length)
