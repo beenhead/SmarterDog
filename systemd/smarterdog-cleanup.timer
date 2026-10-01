@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly cleanup of SmarterDog recordings older than 24 hours
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

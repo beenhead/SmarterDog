@@ -1,0 +1,9 @@
+[Unit]
+Description=Delete SmarterDog recordings older than 24 hours
+RequiresMountsFor=/srv/smarterdog
+
+[Service]
+Type=oneshot
+User=smarterdog
+ExecStartPre=/usr/bin/mountpoint -q /srv/smarterdog
+ExecStart=/usr/bin/find /srv/smarterdog -maxdepth 1 -name '*.mkv' -mmin +1440 -delete

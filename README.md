@@ -19,3 +19,19 @@ Since this is application is not a proper forking daemon you will need to create
 
 You can scan for cameras in your local network with the `-s` switch, it will list the IP address of any detected cameras along with their CID. After obtaining a valid CID you can then start streaming it with the `-S` switch followed by a comma separated list of CIDs.
 When running in streaming mode you can access the stream for a given CID with `rtsp://<yourhost>:8086/CID=<yourcid>`.
+
+## Running as a service and recording
+
+The `systemd/` directory contains units to keep SmarterDog running and to record the last 24 hours of video. Edit the `User=` and the camera CID (`-c` / `CID=`) to match your setup before installing.
+
+* `smarterdog.service` runs the RTSP server at boot and restarts it if it exits. It is granted `CAP_NET_BIND_SERVICE` so the backend can listen on port 443 without running as root.
+* `smarterdog-record.service` uses ffmpeg to save the stream (video only, no re-encoding) as 10 minute `.mkv` files in `/srv/smarterdog`. It refuses to start unless `/srv/smarterdog` is a mount point, so recordings can never fill up the root filesystem.
+* `smarterdog-cleanup.timer` deletes recordings older than 24 hours every hour.
+
+```
+sudo cp systemd/*.service systemd/*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now smarterdog smarterdog-record smarterdog-cleanup.timer
+```
+
+Several RTSP clients (for example the recorder and VLC) can watch a camera at the same time. The camera is started for the first viewer, stopped when the last one leaves, and restarted automatically if its video stops.

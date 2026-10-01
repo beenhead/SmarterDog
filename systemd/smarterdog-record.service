@@ -1,0 +1,23 @@
+[Unit]
+Description=SmarterDog 24/7 camera recorder
+After=smarterdog.service
+Requires=smarterdog.service
+# Never record onto the root filesystem
+RequiresMountsFor=/srv/smarterdog
+
+[Service]
+Type=simple
+User=smarterdog
+ExecStartPre=/usr/bin/mountpoint -q /srv/smarterdog
+# 10 minute segments aligned to the clock; exit after 15s without video so systemd restarts the stream
+ExecStart=/usr/bin/ffmpeg -hide_banner -nostdin -loglevel error \
+	-rtsp_transport udp -timeout 15000000 \
+	-i rtsp://127.0.0.1:8086/CID=YOUR_CAMERA_CID \
+	-map 0:v -c copy \
+	-f segment -segment_time 600 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 \
+	/srv/smarterdog/%%Y-%%m-%%d_%%H-%%M-%%S.mkv
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
