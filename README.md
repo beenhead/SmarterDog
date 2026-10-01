@@ -35,3 +35,24 @@ sudo systemctl enable --now smarterdog smarterdog-record smarterdog-cleanup.time
 ```
 
 Several RTSP clients (for example the recorder and VLC) can watch a camera at the same time. The camera is started for the first viewer, stopped when the last one leaves, and restarted automatically if its video stops.
+
+## Browsing recordings
+
+`viewer/` contains a small web app for browsing the recordings, with no dependencies beyond Python 3 and ffmpeg. It shows:
+
+* A 24 hour activity strip with night hours (22:00–07:00) shaded. Click any point to play that moment.
+* A card per recording, grouped by hour, with an animated thumbnail. When a recording contains motion, the thumbnail is made from the busiest moments.
+* A player with a motion bar and a list of motion events to jump to. Recordings are converted to MP4 (without re-encoding) on demand so they play and seek in any browser.
+* A sensitivity slider and "Motion only" / "Night only" filters.
+
+A background indexer analyses each finished recording at 2 frames per second on a 64×36 grayscale copy, which takes a few seconds per 10 minute file. The top third of the picture is ignored, because it holds the camera's clock overlay and, from a floor level camera, mostly windows and ceiling where changing sunlight looks like motion. Overall brightness changes are compensated for, and a change across most of the picture at once (such as the camera switching to infrared) is treated as lighting rather than motion. Thumbnails and motion data are kept in `/srv/smarterdog/.index` and removed when their recording is deleted.
+
+To install it, set `User=` in `systemd/smarterdog-viewer.service` to the user that owns `/srv/smarterdog`, then:
+
+```
+sudo cp systemd/smarterdog-viewer.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now smarterdog-viewer
+```
+
+Then open `http://<yourhost>:8090/`. There is no login, so only expose it to your local network (with ufw, for example: `sudo ufw allow from 192.168.0.0/16 to any port 8090 proto tcp`).

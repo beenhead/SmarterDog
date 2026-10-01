@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmarterDog Recordings</title>
+<style>
+:root {
+	--bg: #0f1216;
+	--panel: #171b21;
+	--panel-2: #1f242c;
+	--line: #2a313b;
+	--text: #e6e9ee;
+	--muted: #8b95a3;
+	--accent: #f2a93b;
+	--accent-soft: rgba(242, 169, 59, 0.18);
+	--night: rgba(90, 110, 200, 0.14);
+	--ok: #4cc38a;
+	--rec: #ef5350;
+	--radius: 10px;
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+	:root {
+		--bg: #f5f6f8;
+		--panel: #ffffff;
+		--panel-2: #eef0f3;
+		--line: #dde1e7;
+		--text: #1b2027;
+		--muted: #5f6b7a;
+		--accent: #c97a00;
+		--accent-soft: rgba(201, 122, 0, 0.16);
+		--night: rgba(70, 90, 190, 0.10);
+		color-scheme: light;
+	}
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+	position: sticky; top: 0; z-index: 5;
+	background: color-mix(in srgb, var(--bg) 92%, transparent);
+	backdrop-filter: blur(8px);
+	border-bottom: 1px solid var(--line);
+	padding: 12px 16px;
+}
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 17px; margin: 0; letter-spacing: 0.2px; }
+h1 span { color: var(--accent); }
+.status { color: var(--muted); font-size: 13px; }
+.status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rec); margin-right: 6px; vertical-align: 0; animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-left: auto; }
+.controls label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.controls input[type=range] { width: 130px; accent-color: var(--accent); }
+.controls input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+main { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+.summary {
+	background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+	padding: 14px 16px 10px; margin-bottom: 20px;
+}
+.summary-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-bottom: 10px; }
+.summary-head strong { font-size: 15px; }
+.summary-head .muted { color: var(--muted); font-size: 13px; }
+.timeline { position: relative; height: 64px; cursor: crosshair; }
+.timeline canvas { width: 100%; height: 100%; display: block; }
+.ticks { position: relative; height: 18px; color: var(--muted); font-size: 11px; }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.tip {
+	position: absolute; top: -30px; transform: translateX(-50%); pointer-events: none;
+	background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+	padding: 2px 8px; font-size: 12px; white-space: nowrap; display: none;
+}
+.legend { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.hour { margin: 22px 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 0.3px; display: flex; align-items: center; gap: 10px; }
+.hour .moon { font-size: 12px; }
+.hour::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.card {
+	background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+	overflow: hidden; display: flex; flex-direction: column;
+}
+.card.has-motion { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.thumb {
+	position: relative; aspect-ratio: 16 / 9; background: var(--panel-2); cursor: pointer;
+	display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px;
+	border: 0; padding: 0; width: 100%;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .badge {
+	position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,0.65); color: #fff;
+	font-size: 12px; padding: 2px 7px; border-radius: 5px;
+}
+.thumb .badge.motion { background: var(--accent); color: #1b1300; font-weight: 600; }
+.thumb .badge.rec { background: var(--rec); }
+.thumb .dur { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,0.65); color: #fff; font-size: 12px; padding: 1px 6px; border-radius: 5px; }
+.meta { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 7px; }
+.meta .time { display: flex; justify-content: space-between; gap: 8px; }
+.meta .time b { font-size: 14px; }
+.meta .time span { color: var(--muted); font-size: 12px; }
+.strip { height: 18px; border-radius: 4px; background: var(--panel-2); cursor: pointer; display: block; width: 100%; }
+.empty { text-align: center; color: var(--muted); padding: 60px 16px; }
+
+dialog {
+	border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--panel); color: var(--text);
+	width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+}
+dialog::backdrop { background: rgba(0,0,0,0.7); }
+.player-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.player-head b { font-size: 15px; }
+.player-head .muted { color: var(--muted); font-size: 13px; }
+.player-head .spacer { flex: 1; }
+button.btn {
+	background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 7px;
+	padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+}
+button.btn:hover { border-color: var(--accent); }
+button.btn:disabled { opacity: 0.4; cursor: default; border-color: var(--line); }
+.video-wrap { position: relative; background: #000; aspect-ratio: 16 / 9; }
+.video-wrap video { width: 100%; height: 100%; display: block; }
+.video-wrap .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb; pointer-events: none; }
+.player-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.player-strip { position: relative; height: 34px; }
+.player-strip canvas { width: 100%; height: 100%; display: block; border-radius: 6px; background: var(--panel-2); cursor: pointer; }
+.playhead { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); left: 0; pointer-events: none; border-radius: 1px; }
+.events { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+	background: var(--accent-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+	border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; font: inherit; font-size: 12px;
+}
+.chip:hover { background: var(--accent); color: #1b1300; }
+.events .none { color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) {
+	.controls { margin-left: 0; }
+	.grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+	.player-head { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<header>
+	<div class="bar">
+		<h1>Smarter<span>Dog</span> recordings</h1>
+		<div class="status" id="status">Loading…</div>
+		<div class="controls">
+			<label title="How much of the floor area has to change before it counts as motion">Sensitivity
+				<input type="range" id="sensitivity" min="0" max="100" value="50">
+			</label>
+			<label><input type="checkbox" id="motionOnly"> Motion only</label>
+			<label><input type="checkbox" id="nightOnly"> Night only</label>
+		</div>
+	</div>
+</header>
+<main>
+	<section class="summary">
+		<div class="summary-head">
+			<strong id="summaryTitle">Activity, last 24 hours</strong>
+			<span class="muted" id="summaryText"></span>
+		</div>
+		<div class="timeline" id="timeline">
+			<canvas id="timelineCanvas"></canvas>
+			<div class="tip" id="tip"></div>
+		</div>
+		<div class="ticks" id="ticks"></div>
+		<div class="legend">
+			<span><i style="background: var(--accent)"></i>Motion</span>
+			<span><i style="background: var(--muted); opacity: 0.35"></i>Recorded, still</span>
+			<span><i style="background: var(--night); outline: 1px solid var(--line)"></i>Night (22:00–07:00)</span>
+		</div>
+	</section>
+	<div id="list"></div>
+</main>
+
+<dialog id="player">
+	<div class="player-head">
+		<button class="btn" id="prevBtn" title="Previous recording (Shift+←)">‹ Prev</button>
+		<div>
+			<b id="playerTitle"></b>
+			<div class="muted" id="playerSub"></div>
+		</div>
+		<span class="spacer"></span>
+		<button class="btn" id="nextBtn" title="Next recording (Shift+→)">Next ›</button>
+		<button class="btn" id="closeBtn" title="Close (Esc)">Close</button>
+	</div>
+	<div class="video-wrap">
+		<video id="video" controls playsinline preload="auto"></video>
+		<div class="loading" id="loading">Preparing video…</div>
+	</div>
+	<div class="player-body">
+		<div class="player-strip">
+			<canvas id="playerCanvas"></canvas>
+			<div class="playhead" id="playhead"></div>
+		</div>
+		<div class="events" id="events"></div>
+	</div>
+</dialog>
+
+<script>
+"use strict";
+const NIGHT_START = 22, NIGHT_END = 7;
+const $ = id => document.getElementById(id);
+let data = { recordings: [], defaultThreshold: 0.004, lightingChange: 0.5 };
+let current = null;  // stem shown in the player
+
+const store = {
+	get(k, d) { try { const v = localStorage.getItem("sd." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+	set(k, v) { try { localStorage.setItem("sd." + k, JSON.stringify(v)); } catch {} },
+};
+$("sensitivity").value = store.get("sensitivity", 50);
+$("motionOnly").checked = store.get("motionOnly", false);
+$("nightOnly").checked = store.get("nightOnly", false);
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+// Slider 0..100 maps to a changed-area threshold from 3% (least sensitive) down to 0.1%, default in the middle
+function threshold() {
+	const s = Number($("sensitivity").value) / 100;
+	const lo = Math.log(0.03), mid = Math.log(data.defaultThreshold), hi = Math.log(0.001);
+	return Math.exp(s < 0.5 ? lo + (mid - lo) * s * 2 : mid + (hi - mid) * (s - 0.5) * 2);
+}
+
+function events(motion) {
+	const limit = threshold() * 10000, lighting = data.lightingChange * 10000, out = [];
+	motion.forEach((v, s) => {
+		if (v >= limit && v < lighting) {
+			const last = out[out.length - 1];
+			if (last && s - last[1] <= 5) last[1] = s; else out.push([s, s]);
+		}
+	});
+	return out;
+}
+
+function isMotion(v) { return v >= threshold() * 10000 && v < data.lightingChange * 10000; }
+function startOf(r) { return new Date(r.start); }
+function isNight(d) { const h = d.getHours(); return h >= NIGHT_START || h < NIGHT_END; }
+function fmtTime(d, secs) {
+	return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", ...(secs ? { second: "2-digit" } : {}) });
+}
+function fmtDur(s) {
+	if (s == null) return "";
+	const m = Math.floor(s / 60), r = Math.round(s % 60);
+	return m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
+}
+function dayLabel(d) {
+	const today = new Date(); today.setHours(0, 0, 0, 0);
+	const that = new Date(d); that.setHours(0, 0, 0, 0);
+	const diff = Math.round((today - that) / 86400000);
+	if (diff === 0) return "Today";
+	if (diff === 1) return "Yesterday";
+	return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+}
+
+// ------------------------------------------------------------- strips
+
+function sizeCanvas(canvas) {
+	const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+	canvas.width = Math.max(1, Math.round(r.width * dpr));
+	canvas.height = Math.max(1, Math.round(r.height * dpr));
+	const ctx = canvas.getContext("2d");
+	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	return [ctx, r.width, r.height];
+}
+
+function drawStrip(canvas, rec) {
+	const [ctx, w, h] = sizeCanvas(canvas);
+	ctx.clearRect(0, 0, w, h);
+	const motion = rec.motion || [];
+	if (!motion.length) return;
+	const accent = css("--accent"), muted = css("--muted");
+	const limit = threshold() * 10000;
+	const cols = Math.min(motion.length, Math.floor(w));
+	const per = motion.length / cols;
+	for (let c = 0; c < cols; c++) {
+		let peak = 0;
+		for (let s = Math.floor(c * per); s < Math.floor((c + 1) * per); s++) if (isMotion(motion[s])) peak = Math.max(peak, motion[s]);
+		const x = (c / cols) * w, bw = Math.max(1, w / cols);
+		if (peak) {
+			const level = Math.min(1, 0.35 + Math.log(peak / limit + 1) / 3);
+			ctx.fillStyle = accent; ctx.globalAlpha = 1;
+			ctx.fillRect(x, h * (1 - level), bw, h * level);
+		} else {
+			ctx.fillStyle = muted; ctx.globalAlpha = 0.18;
+			ctx.fillRect(x, h - 2, bw, 2);
+		}
+	}
+	ctx.globalAlpha = 1;
+}
+
+// 24 hour activity, one column per minute
+function drawTimeline() {
+	const canvas = $("timelineCanvas");
+	const [ctx, w, h] = sizeCanvas(canvas);
+	ctx.clearRect(0, 0, w, h);
+	const end = new Date(data.now || Date.now()), start = new Date(end - 86400000);
+	const span = end - start, x = t => ((t - start) / span) * w;
+	// night shading
+	ctx.fillStyle = css("--night");
+	for (let d = new Date(start); d < end; d = new Date(d.getTime() + 3600000)) {
+		const hour = new Date(d); hour.setMinutes(0, 0, 0);
+		if (isNight(hour)) ctx.fillRect(x(hour), 0, (3600000 / span) * w + 1, h);
+	}
+	const accent = css("--accent"), muted = css("--muted"), limit = threshold() * 10000;
+	const minutes = new Map();
+	let motionSeconds = 0, nightSeconds = 0, eventCount = 0;
+	for (const r of data.recordings) {
+		if (!r.motion) continue;
+		const t0 = startOf(r).getTime();
+		eventCount += events(r.motion).length;
+		r.motion.forEach((v, s) => {
+			const t = t0 + s * 1000;
+			if (t < start) return;
+			const key = Math.floor((t - start) / 60000);
+			const cur = minutes.get(key) || 0;
+			if (isMotion(v)) {
+				motionSeconds++;
+				if (isNight(new Date(t))) nightSeconds++;
+				minutes.set(key, Math.max(cur, v));
+			} else if (!minutes.has(key)) minutes.set(key, 0);
+		});
+	}
+	const bw = Math.max(1, w / 1440);
+	for (const [key, peak] of minutes) {
+		const px = (key / 1440) * w;
+		if (peak) {
+			const level = Math.min(1, 0.3 + Math.log(peak / limit + 1) / 3);
+			ctx.fillStyle = accent; ctx.globalAlpha = 1;
+			ctx.fillRect(px, h * (1 - level), bw + 0.5, h * level);
+		} else {
+			ctx.fillStyle = muted; ctx.globalAlpha = 0.3;
+			ctx.fillRect(px, h - 3, bw + 0.5, 3);
+		}
+	}
+	ctx.globalAlpha = 1;
+	// ticks every 3 hours
+	const ticks = $("ticks"); ticks.innerHTML = "";
+	const first = new Date(start); first.setMinutes(0, 0, 0);
+	for (let t = new Date(first.getTime() + 3600000); t < end; t = new Date(t.getTime() + 3600000)) {
+		if (t.getHours() % 3) continue;
+		const span_ = document.createElement("span");
+		span_.style.left = `${(x(t) / w) * 100}%`;
+		span_.textContent = t.getHours() === 0 ? dayLabel(t) : fmtTime(t);
+		ticks.appendChild(span_);
+	}
+	$("summaryText").textContent = eventCount
+		? `${eventCount} motion event${eventCount === 1 ? "" : "s"} · ${fmtDur(motionSeconds)} of motion · ${fmtDur(nightSeconds)} at night`
+		: "No motion detected at this sensitivity";
+}
+
+function timelineAt(evt) {
+	const r = $("timeline").getBoundingClientRect();
+	const frac = Math.min(1, Math.max(0, (evt.clientX - r.left) / r.width));
+	const end = new Date(data.now || Date.now());
+	return [new Date(end - 86400000 + frac * 86400000), frac];
+}
+function recordingAt(t) {
+	return data.recordings.find(r => r.duration && startOf(r) <= t && t < new Date(startOf(r).getTime() + r.duration * 1000));
+}
+$("timeline").addEventListener("mousemove", e => {
+	const [t, frac] = timelineAt(e), tip = $("tip"), rec = recordingAt(t);
+	tip.style.display = "block";
+	tip.style.left = `${frac * 100}%`;
+	let label = fmtTime(t);
+	if (rec && rec.motion) {
+		const s = Math.floor((t - startOf(rec)) / 1000);
+		const window_ = rec.motion.slice(Math.max(0, s - 30), s + 30);
+		if (window_.some(isMotion)) label += " · motion";
+	} else if (!rec) label += " · no recording";
+	tip.textContent = label;
+});
+$("timeline").addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
+$("timeline").addEventListener("click", e => {
+	const [t] = timelineAt(e), rec = recordingAt(t);
+	if (!rec || rec.status !== "ready") return;
+	let offset = Math.max(0, Math.floor((t - startOf(rec)) / 1000));
+	// snap to motion within a minute either side
+	const evts = events(rec.motion);
+	const near = evts.find(([a, b]) => offset >= a - 60 && offset <= b + 60);
+	if (near) offset = Math.max(0, near[0] - 2);
+	openPlayer(rec.stem, offset);
+});
+
+// ------------------------------------------------------------- list
+
+function visible() {
+	return data.recordings.filter(r => {
+		if ($("nightOnly").checked && !isNight(startOf(r)) && !isNight(new Date(startOf(r).getTime() + (r.duration || 0) * 1000))) return false;
+		if ($("motionOnly").checked && !(r.motion && events(r.motion).length)) return false;
+		return true;
+	});
+}
+
+function render() {
+	drawTimeline();
+	const list = $("list");
+	list.innerHTML = "";
+	const recs = visible();
+	if (!recs.length) {
+		list.innerHTML = `<div class="empty">${data.recordings.length ? "No recordings match these filters." : "No recordings yet."}</div>`;
+		return;
+	}
+	let grid = null, lastHour = null;
+	for (const r of recs) {
+		const start = startOf(r);
+		const hourKey = `${start.toDateString()} ${start.getHours()}`;
+		if (hourKey !== lastHour) {
+			lastHour = hourKey;
+			const h = document.createElement("div");
+			h.className = "hour";
+			const hourStart = new Date(start); hourStart.setMinutes(0, 0, 0);
+			h.innerHTML = `${dayLabel(start)} · ${fmtTime(hourStart)}${isNight(start) ? ' <span class="moon" title="Night">☾</span>' : ""}`;
+			list.appendChild(h);
+			grid = document.createElement("div");
+			grid.className = "grid";
+			list.appendChild(grid);
+		}
+		grid.appendChild(card(r));
+	}
+	requestAnimationFrame(() => document.querySelectorAll("canvas.strip").forEach(c => drawStrip(c, byStem(c.dataset.stem))));
+}
+
+function byStem(stem) { return data.recordings.find(r => r.stem === stem); }
+
+function card(r) {
+	const el = document.createElement("article");
+	const evts = r.motion ? events(r.motion) : [];
+	const motionSecs = evts.reduce((n, [a, b]) => n + b - a + 1, 0);
+	el.className = "card" + (evts.length ? " has-motion" : "");
+	const start = startOf(r);
+	const endT = r.duration ? new Date(start.getTime() + r.duration * 1000) : null;
+	let badge = "", body = "";
+	if (r.status === "recording") {
+		badge = `<span class="badge rec">● Recording</span>`;
+		body = `<span>Recording now</span>`;
+	} else if (r.status === "processing") {
+		body = `<span>Processing…</span>`;
+	} else if (r.status === "error") {
+		body = `<span>No video</span>`;
+	} else {
+		if (evts.length) badge = `<span class="badge motion">${evts.length} × motion · ${fmtDur(motionSecs)}</span>`;
+		body = r.thumb ? `<img loading="lazy" alt="Preview of ${fmtTime(start)}" src="thumb/${r.stem}.webp">` : `<span>No preview</span>`;
+	}
+	el.innerHTML = `
+		<button class="thumb" ${r.status === "ready" ? "" : "disabled"} aria-label="Play ${fmtTime(start)}">
+			${body}${badge}
+			${r.duration && r.status === "ready" ? `<span class="dur">${fmtDur(r.duration)}</span>` : ""}
+		</button>
+		<div class="meta">
+			<div class="time"><b>${fmtTime(start)}${endT ? "–" + fmtTime(endT) : ""}</b><span>${(r.size / 1048576).toFixed(1)} MB</span></div>
+			${r.status === "ready" ? `<canvas class="strip" data-stem="${r.stem}" title="Click to jump to that moment"></canvas>` : ""}
+		</div>`;
+	if (r.status === "ready") {
+		el.querySelector(".thumb").addEventListener("click", () => openPlayer(r.stem, evts.length ? Math.max(0, evts[0][0] - 2) : 0));
+		el.querySelector(".strip").addEventListener("click", e => {
+			const b = e.currentTarget.getBoundingClientRect();
+			openPlayer(r.stem, Math.floor(((e.clientX - b.left) / b.width) * r.duration));
+		});
+	}
+	return el;
+}
+
+// ------------------------------------------------------------- player
+
+function playable() { return data.recordings.filter(r => r.status === "ready"); }
+
+function openPlayer(stem, offset) {
+	const rec = byStem(stem);
+	if (!rec) return;
+	current = stem;
+	const start = startOf(rec);
+	$("playerTitle").textContent = `${dayLabel(start)} ${fmtTime(start)}–${fmtTime(new Date(start.getTime() + rec.duration * 1000))}`;
+	const evts = events(rec.motion);
+	$("playerSub").textContent = evts.length ? `${evts.length} motion event${evts.length === 1 ? "" : "s"}` : "No motion at this sensitivity";
+	const video = $("video");
+	$("loading").style.display = "flex";
+	video.src = `video/${stem}.mp4#t=${offset || 0}`;
+	video.play().catch(() => {});
+	const list = playable(), i = list.findIndex(r => r.stem === stem);
+	$("prevBtn").disabled = i >= list.length - 1;  // list is newest first
+	$("nextBtn").disabled = i <= 0;
+	const box = $("events");
+	box.innerHTML = "";
+	if (!evts.length) box.innerHTML = `<span class="none">No motion events in this recording.</span>`;
+	for (const [a, b] of evts) {
+		const chip = document.createElement("button");
+		chip.className = "chip";
+		chip.textContent = `${fmtTime(new Date(start.getTime() + a * 1000), true)} · ${fmtDur(b - a + 1)}`;
+		chip.addEventListener("click", () => { video.currentTime = Math.max(0, a - 2); video.play().catch(() => {}); });
+		box.appendChild(chip);
+	}
+	if (!$("player").open) $("player").showModal();
+	requestAnimationFrame(() => drawStrip($("playerCanvas"), rec));
+}
+
+function step(dir) {
+	const list = playable(), i = list.findIndex(r => r.stem === current);
+	const next = list[i - dir];  // newest first, so "next" in time is index - 1
+	if (next) openPlayer(next.stem, 0);
+}
+
+$("video").addEventListener("loadeddata", () => { $("loading").style.display = "none"; });
+$("video").addEventListener("error", () => { $("loading").textContent = "Could not load this video."; });
+$("video").addEventListener("timeupdate", () => {
+	const rec = byStem(current), v = $("video");
+	if (!rec) return;
+	$("playhead").style.left = `${Math.min(100, (v.currentTime / rec.duration) * 100)}%`;
+});
+$("video").addEventListener("ended", () => step(1));
+$("playerCanvas").addEventListener("click", e => {
+	const rec = byStem(current), b = e.currentTarget.getBoundingClientRect();
+	$("video").currentTime = ((e.clientX - b.left) / b.width) * rec.duration;
+});
+$("prevBtn").addEventListener("click", () => step(-1));
+$("nextBtn").addEventListener("click", () => step(1));
+$("closeBtn").addEventListener("click", () => $("player").close());
+$("player").addEventListener("close", () => { const v = $("video"); v.pause(); v.removeAttribute("src"); v.load(); current = null; $("loading").textContent = "Preparing video…"; });
+document.addEventListener("keydown", e => {
+	if (!$("player").open) return;
+	if (e.key === "ArrowLeft" && e.shiftKey) step(-1);
+	if (e.key === "ArrowRight" && e.shiftKey) step(1);
+});
+
+// ------------------------------------------------------------- wiring
+
+for (const id of ["sensitivity", "motionOnly", "nightOnly"]) {
+	$(id).addEventListener("input", () => {
+		store.set(id, id === "sensitivity" ? Number($(id).value) : $(id).checked);
+		render();
+		if (current) openPlayerStripOnly();
+	});
+}
+function openPlayerStripOnly() { const rec = byStem(current); if (rec) drawStrip($("playerCanvas"), rec); }
+
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+
+async function refresh() {
+	try {
+		const res = await fetch("api/recordings", { cache: "no-store" });
+		data = await res.json();
+		const recording = data.recordings.find(r => r.status === "recording");
+		const ready = data.recordings.filter(r => r.status === "ready").length;
+		$("status").innerHTML = (recording ? `<span class="dot"></span>Recording · ` : "Not recording · ") +
+			`${ready} file${ready === 1 ? "" : "s"} · updated ${fmtTime(new Date())}`;
+		// Do not rebuild the page under someone scrolling through the player
+		render();
+	} catch (e) {
+		$("status").textContent = "Cannot reach the SmarterDog viewer";
+	}
+}
+refresh();
+setInterval(() => { if (!$("player").open) refresh(); }, 60000);
+</script>
+</body>
+</html>

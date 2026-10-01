@@ -1,0 +1,21 @@
+[Unit]
+Description=SmarterDog recording viewer (web UI on port 8090)
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/srv/smarterdog
+
+[Service]
+Type=simple
+User=smarterdog
+ExecStart=/usr/bin/python3 /opt/SmarterDog/viewer/smarterdog_viewer.py --recordings /srv/smarterdog --port 8090
+Restart=always
+RestartSec=5
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/smarterdog
+
+[Install]
+WantedBy=multi-user.target
