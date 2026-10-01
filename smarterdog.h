@@ -21,6 +21,7 @@ along with SmarterDog. If not, see <https://www.gnu.org/licenses/>
 #include <QObject>
 #include <QTextStream>
 #include <QMap>
+#include <QTimer>
 
 #include "cleverdogbackend.h"
 #include "cleverdogcamera.h"
@@ -49,6 +50,7 @@ public slots:
 private slots:
 	void terminate();
 	void scanTimeout();
+	void checkStreams();
 private:
 	int scanTime;
 	QMap<QString, CleverdogCamera*> cameras;
@@ -56,6 +58,7 @@ private:
 	CleverdogUDP *cleverdogHandler;
 	QTextStream *qout;
 	RtspHandler *rtspServer;
+	QTimer streamWatchdog;
 };
 
 #endif // SMARTERDOG_H

@@ -20,6 +20,9 @@ along with SmarterDog. If not, see <https://www.gnu.org/licenses/>
 
 #include <QUdpSocket>
 #include <QTimer>
+#include <QElapsedTimer>
+#include <QList>
+#include <QPair>
 
 class MediaRecaster : public QObject
 {
@@ -27,7 +30,10 @@ class MediaRecaster : public QObject
 public:
 	explicit MediaRecaster(QObject *parent = 0);
 	uint16_t getRtpPort();
-	void setRtpDestination(QHostAddress host, uint16_t port);
+	void addRtpDestination(QHostAddress host, uint16_t port);
+	void removeRtpDestination(QHostAddress host, uint16_t port);
+	int destinationCount();
+	qint64 msSinceLastPacket();
 signals:
 	void log(QString message);
 private slots:
@@ -36,8 +42,8 @@ private slots:
 private:
 	QUdpSocket *rtpSocket;
 	QTimer rtcpTimer;
-	QHostAddress rtpRemoteHost;
-	uint16_t rtpRemotePort;
+	QList<QPair<QHostAddress, uint16_t> > rtpDestinations;
+	QElapsedTimer lastPacket;
 	QHostAddress rtcpRemoteHost;
 	uint16_t rtcpRemotePort;
 };

@@ -33,10 +33,28 @@ uint16_t MediaRecaster::getRtpPort()
 	return rtpSocket->localPort();
 }
 
-void MediaRecaster::setRtpDestination(QHostAddress host, uint16_t port)
+void MediaRecaster::addRtpDestination(QHostAddress host, uint16_t port)
 {
-	rtpRemoteHost = host;
-	rtpRemotePort = port;
+	QPair<QHostAddress, uint16_t> destination(host, port);
+	if (!rtpDestinations.contains(destination)) {
+		rtpDestinations.append(destination);
+	}
+}
+
+void MediaRecaster::removeRtpDestination(QHostAddress host, uint16_t port)
+{
+	rtpDestinations.removeAll(QPair<QHostAddress, uint16_t>(host, port));
+}
+
+int MediaRecaster::destinationCount()
+{
+	return rtpDestinations.size();
+}
+
+qint64 MediaRecaster::msSinceLastPacket()
+{
+	/* Never received anything counts as stalled */
+	return lastPacket.isValid() ? lastPacket.elapsed() : -1;
 }
 
 void MediaRecaster::mediaDatagramPending()
@@ -45,7 +63,10 @@ void MediaRecaster::mediaDatagramPending()
 		QByteArray datagramIn;
 		datagramIn.resize(rtpSocket->pendingDatagramSize());
 		rtpSocket->readDatagram(datagramIn.data(), datagramIn.size(), &this->rtcpRemoteHost, &this->rtcpRemotePort);
-		rtpSocket->writeDatagram(datagramIn.data() + 4, datagramIn.size() - 4, this->rtpRemoteHost, this->rtpRemotePort);
+		lastPacket.start();
+		for (const QPair<QHostAddress, uint16_t> &destination : rtpDestinations) {
+			rtpSocket->writeDatagram(datagramIn.data() + 4, datagramIn.size() - 4, destination.first, destination.second);
+		}
 		if (!rtcpTimer.isActive()) {
 			rtcpTimer.start(1000);
 		}

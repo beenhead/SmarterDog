@@ -45,6 +45,7 @@ signals:
 	void log(QString message);
 public slots:
 	void readyRead();
+	void disconnected();
 private:
 	static QString getHeaderItem(QString headerItem, QString header);
 	static void headerLine(QString *header, QString key, QString value);

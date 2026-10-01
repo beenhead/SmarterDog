@@ -23,6 +23,7 @@ RtspConnection::RtspConnection(QTcpSocket *rtspClientSocket, SmarterDog *control
 {
 	rtspState = none;
 	connect(rtspClientSocket, SIGNAL(readyRead()), this, SLOT(readyRead()));
+	connect(rtspClientSocket, SIGNAL(disconnected()), this, SLOT(disconnected()));
 }
 
 void RtspConnection::setRtpSourcePort(uint16_t port)
@@ -76,8 +77,7 @@ void RtspConnection::readyRead()
 			cameraCid = match.captured(1);
 			emit log ("CID: " + match.captured(1));
 		}
-		rtpSourcePort = controller->getRtpSourcePort("123");
-//		rtpSourcePort = controller->getRtpSourcePort(cameraCid);
+		rtpSourcePort = controller->getRtpSourcePort(cameraCid);
 		if (transport.length() > 0) {
 			transport = transport.append(";");
 		}
@@ -91,8 +91,10 @@ void RtspConnection::readyRead()
 	} else if (request == "PAUSE") {
 		rtspState = pause;
 	} else if (request == "TEARDOWN") {
+		if (rtspState == play || rtspState == pause) {
+			emit stopStream(cameraCid, rtpDestinationHost, rtpDestinationPort);
+		}
 		rtspState = none;
-		emit stopStream(cameraCid, rtpDestinationHost, rtpDestinationPort);
 	} else {
 //		emit log("Unknown message: " + incoming);
 		reply = "RTSP/1.0 405 Method Not Allowed\r\n";
@@ -105,6 +107,16 @@ void RtspConnection::readyRead()
 	emit log("Write: " + reply);
 	emit log("===========================================================");
 	rtspClientSocket->write(QByteArray(reply.toLatin1()));
+}
+
+void RtspConnection::disconnected()
+{
+	/* Client went away without a TEARDOWN (crashed or killed) */
+	if (rtspState == play || rtspState == pause) {
+		emit log("RTSP client disconnected without TEARDOWN, removing it");
+		emit stopStream(cameraCid, rtpDestinationHost, rtpDestinationPort);
+	}
+	rtspState = none;
 }
 
 QString RtspConnection::getHeaderItem(QString headerItem, QString header)
