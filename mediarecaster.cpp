@@ -63,7 +63,24 @@ void MediaRecaster::mediaDatagramPending()
 		QByteArray datagramIn;
 		datagramIn.resize(rtpSocket->pendingDatagramSize());
 		rtpSocket->readDatagram(datagramIn.data(), datagramIn.size(), &this->rtcpRemoteHost, &this->rtcpRemotePort);
+		/* Camera also sends G.711 audio (payload type 0) on this port, only forward H.264 video (payload type 96) */
+		if (datagramIn.size() < 4 + 12 || (datagramIn.at(4 + 1) & 0x7f) != 96) {
+			continue;
+		}
 		lastPacket.start();
+		/* Camera stamps video with a 36kHz clock but the SDP (and H.264 over RTP) uses 90kHz, rescale by 5/2 */
+		uint32_t cameraTimestamp;
+		memcpy(&cameraTimestamp, datagramIn.constData() + 4 + 4, 4);
+		cameraTimestamp = ntohl(cameraTimestamp);
+		if (haveCameraTimestamp) {
+			unwrappedTimestamp += (int32_t)(cameraTimestamp - lastCameraTimestamp);
+		} else {
+			unwrappedTimestamp = cameraTimestamp;
+			haveCameraTimestamp = true;
+		}
+		lastCameraTimestamp = cameraTimestamp;
+		uint32_t rtpTimestamp = htonl((uint32_t)(unwrappedTimestamp * 5 / 2));
+		memcpy(datagramIn.data() + 4 + 4, &rtpTimestamp, 4);
 		for (const QPair<QHostAddress, uint16_t> &destination : rtpDestinations) {
 			rtpSocket->writeDatagram(datagramIn.data() + 4, datagramIn.size() - 4, destination.first, destination.second);
 		}

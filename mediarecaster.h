@@ -44,6 +44,9 @@ private:
 	QTimer rtcpTimer;
 	QList<QPair<QHostAddress, uint16_t> > rtpDestinations;
 	QElapsedTimer lastPacket;
+	bool haveCameraTimestamp = false;
+	uint32_t lastCameraTimestamp = 0;
+	qint64 unwrappedTimestamp = 0;
 	QHostAddress rtcpRemoteHost;
 	uint16_t rtcpRemotePort;
 };
