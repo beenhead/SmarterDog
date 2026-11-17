@@ -64,11 +64,23 @@ void SmarterDog::log(QString message)
 void SmarterDog::scanResult(QHostAddress host, QString CID, QString mac, QString firmware)
 {
 	if (CID != "" && mac != "" && firmware != "") {
-		CleverdogCamera *camera = new CleverdogCamera(host, CID, mac, firmware);
 		if (cameras.contains(CID)) {
-			delete cameras.value(CID);
+			/* Update in place so the recaster and its viewers survive a rescan */
+			CleverdogCamera *camera = cameras.value(CID);
+			bool moved = camera->address != host;
+			camera->address = host;
+			camera->cid = CID;
+			camera->mac = mac;
+			camera->firmware = firmware;
+			if (!moved) {
+				return;
+			}
+			if (camera->recaster->destinationCount() > 0) {
+				cleverdogHandler->startRtp(camera->address, camera->cid, camera->recaster->getRtpPort());
+			}
+		} else {
+			cameras.insert(CID, new CleverdogCamera(host, CID, mac, firmware));
 		}
-		cameras.insert(CID, camera);
 		log(QString("%1 %2 %3 %4").arg(host.toString(), CID, mac, firmware));
 	}
 }
@@ -109,15 +121,26 @@ void SmarterDog::terminate()
 void SmarterDog::checkStreams()
 {
 	/* Restart cameras that have viewers but stopped sending video */
+	bool rescan = false;
 	foreach (CleverdogCamera *camera, cameras) {
-		if (camera->address.isNull() || camera->recaster->destinationCount() == 0) {
+		if (camera->address.isNull()) {
+			/* Not found yet, e.g. the network was not up when we started */
+			rescan = true;
+			continue;
+		}
+		if (camera->recaster->destinationCount() == 0) {
 			continue;
 		}
 		qint64 idle = camera->recaster->msSinceLastPacket();
 		if (idle < 0 || idle > 5000) {
 			log("No video from " + camera->cid + ", restarting stream");
 			cleverdogHandler->startRtp(camera->address, camera->cid, camera->recaster->getRtpPort());
+			/* The camera may have a new address from DHCP */
+			rescan = true;
 		}
+	}
+	if (rescan) {
+		cleverdogHandler->scanForDevices();
 	}
 }
 
